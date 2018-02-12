@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import xyz.scarabya.shuffledprojectsupdater.domain.Package;
@@ -44,10 +45,14 @@ public class Engine
     private final String UPDATING_MSG = "Updating {0} into {1}";    
     private final String MOVED_MSG = "{0} moved from {1} to {2}";
     private final String UPDATING_MOVED_MSG = MOVED_MSG +"! Updating from {1}";
+    private final String FILE_NOT_FOUND = "Original version of {0} not found!";
+    private final Set<String> dirToExclude, fileToExclude;
 
-    public Engine()
+    public Engine(Set<String> dirToExclude, Set<String> fileToExclude)
     {
         sourceDirs = new HashMap<>();
+        this.dirToExclude = dirToExclude;
+        this.fileToExclude = fileToExclude;
     }
     
     public void doOperation(final File rootDirectory,
@@ -56,7 +61,8 @@ public class Engine
             SubDirNotFoundException, DuplicateFileFoundException, IOException
     {
         for (File projectDir : rootDirectory.listFiles())
-            if (projectDir.isDirectory())
+            if (projectDir.isDirectory() &&
+                    !dirToExclude.contains(projectDir.getName()))
             {
                 final String projectName = projectDir.getName();
                 final File sourceDir = Walker.walkInto(Walker
@@ -94,18 +100,31 @@ public class Engine
         {
             processingName = processing.getName();
             logParams[0] = processingName;
-            if (processing.isDirectory())
+            if (processing.isFile())
             {
-                walkAndDoOperation(processing, projectName,
-                        originalPkg.getSubPackage(processingName), operation);
+                if(!fileToExclude.contains(processingName))
+                {
+                    originalFile = originalPkg.getOriginalFile(processingName);
+                    if(originalFile != null)
+                    {
+                        originalProjectName = originalFile.getProjectName();
+                        logParams[1] = originalProjectName;
+                        logAndOperate(processing, projectName,
+                                originalProjectName, originalFile, logParams,
+                                operation);
+                    }
+                    else
+                        LOGGER.log(WARNING_LOG, FILE_NOT_FOUND, logParams);
+                }
             }
             else
             {
-                originalFile = originalPkg.getOriginalFile(processingName);
-                originalProjectName = originalFile.getProjectName();
-                logParams[1] = originalProjectName;
-                logAndOperate(processing, projectName, originalProjectName,
-                        originalFile, logParams, operation);
+                Package subPackage = originalPkg.getSubPackage(processingName);
+                if(subPackage != null)
+                    walkAndDoOperation(processing, projectName,
+                        originalPkg.getSubPackage(processingName), operation);
+                else
+                    LOGGER.log(WARNING_LOG, FILE_NOT_FOUND, logParams);
             }
         }
     }
