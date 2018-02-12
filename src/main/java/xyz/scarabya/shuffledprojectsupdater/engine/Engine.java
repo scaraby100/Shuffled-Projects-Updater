@@ -46,13 +46,20 @@ public class Engine
     private final String MOVED_MSG = "{0} moved from {1} to {2}";
     private final String UPDATING_MOVED_MSG = MOVED_MSG +"! Updating from {1}";
     private final String FILE_NOT_FOUND = "Original version of {0} not found!";
-    private final Set<String> dirToExclude, fileToExclude;
+    private final Set<String> dirToExclude, fileToExclude, dirToBypass,
+            fileToBypass;
+    private final boolean notSourcesForcedUpdate;
 
-    public Engine(Set<String> dirToExclude, Set<String> fileToExclude)
+    public Engine(Set<String> dirToExclude, Set<String> fileToExclude,
+            Set<String> dirToBypass, Set<String> fileToBypass,
+            boolean notSourcesForcedUpdate)
     {
         sourceDirs = new HashMap<>();
         this.dirToExclude = dirToExclude;
         this.fileToExclude = fileToExclude;
+        this.dirToBypass = dirToBypass;
+        this.fileToBypass = fileToBypass;
+        this.notSourcesForcedUpdate = notSourcesForcedUpdate;
     }
     
     public void doOperation(final File rootDirectory,

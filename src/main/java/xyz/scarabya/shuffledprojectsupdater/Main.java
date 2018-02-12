@@ -18,6 +18,7 @@ package xyz.scarabya.shuffledprojectsupdater;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -34,10 +35,12 @@ import xyz.scarabya.shuffledprojectsupdater.log.LightLogger;
  */
 public class Main
 {
-    private final static Logger LOGGER = Logger.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private final static Logger LOGGER = Logger.getLogger(Logger.GLOBAL_LOGGER_NAME);    
     
     private final static File DIR_EXCLUSION_FILE = new File("dir.exclusion");
     private final static File FILE_EXCLUSION_FILE = new File("file.exclusion");
+    private final static File DIR_BYPASS_FILE = new File("dir.bypass");
+    private final static File FILE_BYPASS_FILE = new File("file.bypass");
 
     public static void main(String[] args) throws Exception
     {
@@ -55,38 +58,28 @@ public class Main
                 "Inserisci il numero di sottocartelle da saltare",
                 "0"));
         
+        boolean notSourcesForcedUpdate = JOptionPane.showConfirmDialog(null,
+                "Aggiornare in modo diretto (senza controlli) i file esterni "
+                        + "alla cartella sorgenti \""+sourceRootName+"?",
+                "Aggiornamento diretto", JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION;
+        
         JOptionPane.showMessageDialog(null, "Puoi definire una lista di "
-                + "esclusioni (un valore per riga) nei file: \ndir.exclusion "
-                + "(esclusione directory progetti)\nfile.exclusion "
-                + "(esclusione file)",
-                "Esclusioni", JOptionPane.INFORMATION_MESSAGE);
-        
-        final Set<String> dirToExclude = new HashSet<>();
-        final Set<String> fileToExclude = new HashSet<>();
-        
-        String line;                
-        if(DIR_EXCLUSION_FILE.exists())
-        {
-            try (BufferedReader br = new BufferedReader(
-                    new FileReader(DIR_EXCLUSION_FILE)))
-            {
-                while ((line = br.readLine()) != null)
-                    dirToExclude.add(line);
-            }
-        }
-        if(FILE_EXCLUSION_FILE.exists())
-        {
-            try (BufferedReader br = new BufferedReader(
-                    new FileReader(FILE_EXCLUSION_FILE)))
-            {
-                while ((line = br.readLine()) != null)
-                    fileToExclude.add(line);
-            }
-        }
+                + "esclusioni (un valore per riga) nei file: \n"
+                + "dir.exclusion (progetti da non processare)\n"
+                + "file.exclusion (file da non processare)\n"
+                + "dir.bypass (progetti da aggiornare senza controlli)\n"
+                + "file.bypass (file da aggiornare senza controlli)",
+                "Esclusioni", JOptionPane.INFORMATION_MESSAGE);        
+        final Set<String> dirToExclude = readRulesFile(DIR_EXCLUSION_FILE);
+        final Set<String> fileToExclude = readRulesFile(FILE_EXCLUSION_FILE);
+        final Set<String> dirToBypass = readRulesFile(DIR_BYPASS_FILE);
+        final Set<String> fileToBypass = readRulesFile(FILE_BYPASS_FILE);
         
         Operation operation = showOperationChooser();
         
-        Engine engine = new Engine(dirToExclude, fileToExclude);
+        Engine engine = new Engine(dirToExclude, fileToExclude, dirToBypass,
+                fileToBypass, notSourcesForcedUpdate);
         
         engine.doOperation(originalFolder, sourceRootName, sottocartelle,
                 Operation.CREATE);        
@@ -109,8 +102,24 @@ public class Main
         String[] options = {"Verifica file", "Aggiorna file"};
         Operation[] operations = {Operation.CHECK, Operation.UPDATE};
         return operations[JOptionPane.showOptionDialog(null, "Cosa vuoi fare?",
-                "Scelta operazione",
-                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
-                null, options, options[0])];
+                "Scelta operazione", JOptionPane.DEFAULT_OPTION,
+                JOptionPane.QUESTION_MESSAGE, null, options, options[0])];
+    }
+    
+    private static Set<String> readRulesFile(final File fileToRead)
+            throws IOException
+    {
+        String line;
+        final Set<String> importRows = new HashSet<>();
+        if(fileToRead.exists())
+        {
+            try (BufferedReader br = new BufferedReader(
+                    new FileReader(fileToRead)))
+            {
+                while ((line = br.readLine()) != null)
+                    importRows.add(line);
+            }
+        }
+        return importRows;
     }
 }
