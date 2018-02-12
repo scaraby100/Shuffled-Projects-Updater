@@ -25,6 +25,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import xyz.scarabya.shuffledprojectsupdater.domain.Package;
 import xyz.scarabya.shuffledprojectsupdater.domain.DuplicateFileFoundException;
+import xyz.scarabya.shuffledprojectsupdater.domain.Operation;
 import xyz.scarabya.shuffledprojectsupdater.domain.OriginalFile;
 import xyz.scarabya.shuffledprojectsupdater.domain.SubDirNotFoundException;
 import xyz.scarabya.shuffledprojectsupdater.domain.TooManyDirectoriesException;
@@ -35,7 +36,7 @@ import xyz.scarabya.shuffledprojectsupdater.domain.TooManyDirectoriesException;
  */
 public class Engine
 {
-    private Map<String, Package> sourceDirs;
+    private final Map<String, Package> sourceDirs;
     private final Level INFO_LOG = Level.INFO;
     private final Level WARNING_LOG = Level.WARNING;
     private final static Logger LOGGER =
@@ -43,12 +44,17 @@ public class Engine
     private final String UPDATING_MSG = "Updating {0} into {1}";    
     private final String MOVED_MSG = "{0} moved from {1} to {2}";
     private final String UPDATING_MOVED_MSG = MOVED_MSG +"! Updating from {1}";
-    
-    public void createProjectsTree(File rootDirectory, String sourceRootName,
-            int sourceLevel) throws TooManyDirectoriesException,
-            SubDirNotFoundException, DuplicateFileFoundException
+
+    public Engine()
     {
         sourceDirs = new HashMap<>();
+    }
+    
+    public void doOperation(final File rootDirectory,
+            final String sourceRootName, final int sourceLevel,
+            final Operation operation) throws TooManyDirectoriesException,
+            SubDirNotFoundException, DuplicateFileFoundException, IOException
+    {
         for (File projectDir : rootDirectory.listFiles())
             if (projectDir.isDirectory())
             {
@@ -56,69 +62,66 @@ public class Engine
                 final File sourceDir = Walker.walkInto(Walker
                         .getSourceDir(projectDir, sourceRootName), sourceLevel);
                 final String sourceDirName = sourceDir.getName();
-                if(sourceDirs.containsKey(sourceDirName))
-                    sourceDirs.get(sourceDirName)
-                            .mergeUsingPkg(getPackage(sourceDir, projectName));
+                
+                if(operation == Operation.CREATE)
+                    addPackage(sourceDirName, sourceDir, projectName);
                 else
-                    sourceDirs.put(sourceDirName,
-                            getPackage(sourceDir, projectName));
+                    walkAndDoOperation(sourceDir, projectName,
+                            sourceDirs.get(sourceDirName), operation);
             }
     }
     
-    public void updateFiles(File rootDirectory, String sourceRootName,
-            int sourceLevel) throws TooManyDirectoriesException,
-            SubDirNotFoundException, IOException
+    private void addPackage(final String sourceDirName, final File sourceDir,
+            final String projectName) throws TooManyDirectoriesException,
+            SubDirNotFoundException, DuplicateFileFoundException
     {
-        for (File projectDir : rootDirectory.listFiles())
-            if (projectDir.isDirectory())
-            {
-                final String projectName = projectDir.getName();
-                final File sourceDir = Walker.walkInto(Walker
-                        .getSourceDir(projectDir, sourceRootName), sourceLevel);
-                final String sourceDirName = sourceDir.getName();
-                walkAndUpdateFiles(sourceDir, projectName,
-                        sourceDirs.get(sourceDirName));
-            }
+        if(sourceDirs.containsKey(sourceDirName))
+            sourceDirs.get(sourceDirName)
+                    .mergeUsingPkg(getPackage(sourceDir, projectName));
+        else
+            sourceDirs.put(sourceDirName,getPackage(sourceDir, projectName));
     }
     
-    public void verifyMovedFiles(File rootDirectory, String sourceRootName,
-            int sourceLevel) throws TooManyDirectoriesException,
-            SubDirNotFoundException
-    {
-        for (File projectDir : rootDirectory.listFiles())
-            if (projectDir.isDirectory())
-            {
-                final String projectName = projectDir.getName();
-                final File sourceDir = Walker.walkInto(Walker
-                        .getSourceDir(projectDir, sourceRootName), sourceLevel);
-                final String sourceDirName = sourceDir.getName();
-                walkAndCheckMovedFiles(sourceDir, projectName,
-                        sourceDirs.get(sourceDirName));
-            }
-    }
-    
-    private void walkAndUpdateFiles(final File dirToUpdate,
-            final String projectName, final Package originalPkg)
-            throws IOException
+    private void walkAndDoOperation(final File pkgToProcess,
+            final String projectName, final Package originalPkg,
+            final Operation operation) throws IOException
     {
         OriginalFile originalFile;
-        String updatingName, originalProjectName;
+        String processingName, originalProjectName;
         String[] logParams = new String[3];
         logParams[2] = projectName;
-        for (File updating : dirToUpdate.listFiles())
-        {            
-            updatingName = updating.getName();
-            logParams[0] = updatingName;
-            if (updating.isDirectory())
+        for (File processing : pkgToProcess.listFiles())
+        {
+            processingName = processing.getName();
+            logParams[0] = processingName;
+            if (processing.isDirectory())
             {
-                walkAndUpdateFiles(dirToUpdate, projectName,
-                        originalPkg.getSubPackage(updatingName));
+                walkAndDoOperation(processing, projectName,
+                        originalPkg.getSubPackage(processingName), operation);
             }
             else
             {
-                originalFile = originalPkg.getOriginalFile(updatingName);
+                originalFile = originalPkg.getOriginalFile(processingName);
                 originalProjectName = originalFile.getProjectName();
                 logParams[1] = originalProjectName;
+                logAndOperate(processing, projectName, originalProjectName,
+                        originalFile, logParams, operation);
+            }
+        }
+    }
+    
+    private void logAndOperate(final File updating, final String projectName,
+            final String originalProjectName, final OriginalFile originalFile,
+            final String[] logParams, final Operation operation)
+            throws IOException
+    {
+        switch(operation)
+        {
+            case CHECK:
+                if(!projectName.equals(originalProjectName))
+                    LOGGER.log(WARNING_LOG, MOVED_MSG, logParams);
+                break;
+            case UPDATE:
                 if(projectName.equals(originalProjectName))
                     LOGGER.log(INFO_LOG, UPDATING_MSG, logParams);
                 else
@@ -127,35 +130,7 @@ public class Engine
                         updating.toPath(),
                         StandardCopyOption.REPLACE_EXISTING,
                         StandardCopyOption.COPY_ATTRIBUTES);
-            }
-        }
-    }
-
-    private void walkAndCheckMovedFiles(final File dirToCheck,
-            final String projectName, final Package originalPkg)
-    {
-        OriginalFile originalFile;
-        String checkingName, originalProjectName, msg;
-        String[] logParams = new String[3];
-        logParams[2] = projectName;
-        for (File checking : dirToCheck.listFiles())
-        {
-            checkingName = checking.getName();
-            logParams[0] = checkingName;
-            if (checking.isDirectory())
-            {
-                walkAndCheckMovedFiles(checking, projectName,
-                        originalPkg.getSubPackage(checkingName));
-            }
-            else
-            {
-                originalFile = originalPkg.getOriginalFile(checkingName);
-                originalProjectName = originalFile.getProjectName();
-                logParams[1] = originalProjectName;
-                
-                if(!projectName.equals(originalProjectName))
-                    LOGGER.log(WARNING_LOG, MOVED_MSG, logParams);
-            }
+                break;                
         }
     }
     

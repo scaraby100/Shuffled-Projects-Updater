@@ -22,6 +22,7 @@ import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.filechooser.FileSystemView;
+import xyz.scarabya.shuffledprojectsupdater.domain.Operation;
 import xyz.scarabya.shuffledprojectsupdater.engine.Engine;
 import xyz.scarabya.shuffledprojectsupdater.log.LightLogger;
 
@@ -35,19 +36,10 @@ public class Main
 
     public static void main(String[] args) throws Exception
     {
-        try
-        {
-            LightLogger.setup();
-        }
-        catch (IOException e)
-        {
-            LOGGER.severe(e.getMessage());
-            throw new RuntimeException("Problems with creating the log files");
-        }
-        
+        LightLogger.setup();
+    
         File originalFolder = showFileChooser(
                 "Seleziona la cartella del parent project aggiornato", null);
-        
         File folderToUpdate = showFileChooser(
                 "Seleziona la cartella del parent da aggiornare", null);
         
@@ -58,25 +50,14 @@ public class Main
                 "Inserisci il numero di sottocartelle da saltare",
                 "0"));
         
+        Operation operation = showOperationChooser();
+        
         Engine engine = new Engine();
         
-        int operation = showOperationChooser();
-        
-        System.out.println(operation);
-        
-        engine.createProjectsTree(originalFolder, sourceRootName, sottocartelle);
-        
-        switch(operation)
-        {
-            case 0:
-                engine.verifyMovedFiles(folderToUpdate, sourceRootName,
-                        sottocartelle);
-                break;
-            case 1:
-                engine.updateFiles(folderToUpdate, sourceRootName,
-                        sottocartelle);
-                break;                
-        }       
+        engine.doOperation(originalFolder, sourceRootName, sottocartelle,
+                Operation.CREATE);        
+        engine.doOperation(folderToUpdate, sourceRootName, sottocartelle,
+                operation);   
     }
     
     private static File showFileChooser(String message, String extension)
@@ -84,30 +65,18 @@ public class Main
         JFileChooser jfc = new JFileChooser(FileSystemView.getFileSystemView()
                 .getHomeDirectory());
         jfc.setDialogTitle(message);
-        if (extension != null)
-        {
-            jfc.setFileSelectionMode(JFileChooser.FILES_ONLY);
-            jfc.setFileFilter(new FileNameExtensionFilter("File "
-                    + extension.toUpperCase(), extension));
-            jfc.showSaveDialog(null);
-            String filename = jfc.getSelectedFile().getAbsolutePath();
-            if (!filename.endsWith("." + extension))
-                return new File(filename + "." + extension);
-        }
-        else
-        {
-            jfc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-            jfc.showOpenDialog(null);
-        }
+        jfc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        jfc.showOpenDialog(null);
         return jfc.getSelectedFile();
     }
     
-    private static int showOperationChooser()
+    private static Operation showOperationChooser()
     {
         String[] options = {"Verifica file", "Aggiorna file"};
-        return JOptionPane.showOptionDialog(null, "Cosa vuoi fare?",
+        Operation[] operations = {Operation.CHECK, Operation.UPDATE};
+        return operations[JOptionPane.showOptionDialog(null, "Cosa vuoi fare?",
                 "Scelta operazione",
                 JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
-                null, options, options[0]);
+                null, options, options[0])];
     }
 }
