@@ -65,7 +65,39 @@ public class Engine
             }
     }
     
-    public void walkAndUpdateFiles(final File dirToUpdate,
+    public void updateFiles(File rootDirectory, String sourceRootName,
+            int sourceLevel) throws TooManyDirectoriesException,
+            SubDirNotFoundException, IOException
+    {
+        for (File projectDir : rootDirectory.listFiles())
+            if (projectDir.isDirectory())
+            {
+                final String projectName = projectDir.getName();
+                final File sourceDir = Walker.walkInto(Walker
+                        .getSourceDir(projectDir, sourceRootName), sourceLevel);
+                final String sourceDirName = sourceDir.getName();
+                walkAndUpdateFiles(sourceDir, projectName,
+                        sourceDirs.get(sourceDirName));
+            }
+    }
+    
+    public void verifyMovedFiles(File rootDirectory, String sourceRootName,
+            int sourceLevel) throws TooManyDirectoriesException,
+            SubDirNotFoundException
+    {
+        for (File projectDir : rootDirectory.listFiles())
+            if (projectDir.isDirectory())
+            {
+                final String projectName = projectDir.getName();
+                final File sourceDir = Walker.walkInto(Walker
+                        .getSourceDir(projectDir, sourceRootName), sourceLevel);
+                final String sourceDirName = sourceDir.getName();
+                walkAndCheckMovedFiles(sourceDir, projectName,
+                        sourceDirs.get(sourceDirName));
+            }
+    }
+    
+    private void walkAndUpdateFiles(final File dirToUpdate,
             final String projectName, final Package originalPkg)
             throws IOException
     {
@@ -99,7 +131,7 @@ public class Engine
         }
     }
 
-    public void walkAndCheckMovedFiles(final File dirToCheck,
+    private void walkAndCheckMovedFiles(final File dirToCheck,
             final String projectName, final Package originalPkg)
     {
         OriginalFile originalFile;
@@ -125,38 +157,6 @@ public class Engine
                     LOGGER.log(WARNING_LOG, MOVED_MSG, logParams);
             }
         }
-    }
-    
-    public void updateFiles(File rootDirectory, String sourceRootName,
-            int sourceLevel) throws TooManyDirectoriesException,
-            SubDirNotFoundException, IOException
-    {
-        for (File projectDir : rootDirectory.listFiles())
-            if (projectDir.isDirectory())
-            {
-                final String projectName = projectDir.getName();
-                final File sourceDir = Walker.walkInto(Walker
-                        .getSourceDir(projectDir, sourceRootName), sourceLevel);
-                final String sourceDirName = sourceDir.getName();
-                walkAndUpdateFiles(sourceDir, projectName,
-                        sourceDirs.get(sourceDirName));
-            }
-    }
-    
-    public void verifyMovedFiles(File rootDirectory, String sourceRootName,
-            int sourceLevel) throws TooManyDirectoriesException,
-            SubDirNotFoundException
-    {
-        for (File projectDir : rootDirectory.listFiles())
-            if (projectDir.isDirectory())
-            {
-                final String projectName = projectDir.getName();
-                final File sourceDir = Walker.walkInto(Walker
-                        .getSourceDir(projectDir, sourceRootName), sourceLevel);
-                final String sourceDirName = sourceDir.getName();
-                walkAndCheckMovedFiles(sourceDir, projectName,
-                        sourceDirs.get(sourceDirName));
-            }
     }
     
     private Package getPackage(final File rootDirectory,
