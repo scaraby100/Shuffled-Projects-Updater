@@ -157,12 +157,20 @@ public class Engine
             final String projectName)
     {
         Package newPackage = new Package();
+        String fileName;
         for (File file : rootDirectory.listFiles())
+        {
+            fileName = file.getName();
             if (file.isDirectory())
-                newPackage.addPackage(file.getName(),
+                newPackage.addPackage(fileName,
                         getPackage(file, projectName));
             else
-                newPackage.addFile(new OriginalFile(file, projectName));
+            {
+                if(!fileToExclude.contains(fileName))
+                    newPackage.addFile(fileName, new OriginalFile(
+                            file.getAbsolutePath(), projectName));
+            }
+        }
         
         return newPackage;
     }

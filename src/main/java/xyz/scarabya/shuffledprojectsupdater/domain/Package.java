@@ -28,13 +28,6 @@ public class Package
     private final Map<String, OriginalFile> files;
     private final Map<String, Package> subPackages;
 
-    public Package(OriginalFile firstFile)
-    {
-        files = new HashMap<>();
-        files.put(firstFile.getFilename(), firstFile);
-        subPackages = new HashMap<>();
-    }
-    
     public Package()
     {
         files = new HashMap<>();
@@ -62,9 +55,9 @@ public class Package
         }
     }
     
-    public void addFile(final OriginalFile file)
+    public void addFile(final String fileName, final OriginalFile file)
     {
-        files.put(file.getFilename(), file);
+        files.put(fileName, file);
     }
     
     public void addPackage(String packageName, Package newPackage)

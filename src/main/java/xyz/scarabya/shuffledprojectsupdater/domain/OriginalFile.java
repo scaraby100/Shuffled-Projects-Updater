@@ -24,13 +24,11 @@ import java.io.File;
 public class OriginalFile
 {
     private final String absName;
-    private final String filename;
     private final String projectName;
     
-    public OriginalFile(File file, String projectName)
+    public OriginalFile(String absName, String projectName)
     {
-        this.absName = file.getAbsolutePath();
-        this.filename = file.getName();
+        this.absName = absName;
         this.projectName = projectName;
     }
 
@@ -39,11 +37,6 @@ public class OriginalFile
         return absName;
     }
 
-    public String getFilename()
-    {
-        return filename;
-    }
-    
     public String getProjectName()
     {
         return projectName;
